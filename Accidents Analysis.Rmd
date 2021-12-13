@@ -1,0 +1,271 @@
+---
+title: "Midterm Project"
+author: "Pruthvi Bharadwaj"
+date: "11/8/2021"
+output: pdf_document
+---
+Access the codes at : [github: https://github.com/]
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+ggplot2,
+rjson,
+knitr,
+arm,
+data.table,
+tidyverse,
+rstan,
+rstanarm,
+mice
+)
+```
+
+Abstract
+
+The global epidemic of road crash fatalities and disabilities is gradually being recognized as a major public health concern. Reducing traffic accidents is an important public safety challenge around the world.
+The first step to being informed about global road safety and to developing effective road safety interventions is to have access to facts. This project aims to understand the impact of weather and temporal variables on the frequency of accidents in New England. A generalized multilevel mixed effects model is used to predict the frequency of accidents in the different counties of the region and their association with weather related variables are explored. The implications and limitations for choosing multilevel mixed effects model are also discussed later. The report offers directional inferences to explain fluctuation in frequency of accidents. Next steps and additional layers of complexity that can be incorporated in accident frequency prediction are also suggested towards the end.
+
+Introduction
+
+Accident prediction is important for optimizing public transportation, enabling safer routes, and cost-effectively improving the transportation infrastructure, all in order to make the roads safer. Given its significance, accident analysis and prediction has been a topic of much research in the past few decades.
+Analyzing the impact of environmental stimuli (e.g., road-network properties, weather, and traffic) on traffic accident occurrence patterns, predicting frequency of accidents within a geographical region, and predicting risk of accidents are the major related research categories. 
+
+Background 
+
+
+
+Method
+
+Dataset
+
+US-Accidents is a dataset that is available on Kaggle.It is a countrywide car accident dataset, which covers 49 states of the USA. It contains car accidents records from February 2016 to December 2020. It was collected using multiple APIs that provide streaming traffic incident (or event) data. Currently, there are about 1.5 million accident records in this dataset.
+
+The dataset offers a wide range of data attributes to describe each accident record. It includes location data(coordinates, Geographical info like State, City, County), time data(timestamp of accident, day/night indicator), natural language description of event, weather data(Temperature, humidity, precipitation, etc),  and relevant points-of-interest data (traffic signal, stop sign, etc.).
+
+It can be used for numerous applications such as real-time car accident prediction, studying car accidents hotspot locations, casualty analysis and extracting cause and effect rules to predict car accidents, and studying the impact of precipitation or other environmental stimuli on accident occurrence. The most recent release of the dataset can also be useful to study the impact of COVID-19 on traffic behavior and accidents.
+
+#Importing the dataset
+
+```{r}
+
+path <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/US_Accidents_Dec20_updated.csv"
+accidents <- read.csv(path)
+
+```
+
+Data Cleaning and Preparation
+
+The entire dataset contains accident occurrences across 49 states in the US. For my project I was only focusing on 6 states in New England and hence I filtered out only the relevant records. 
+
+Also, during data exploration I found that data from 2016 and 2020 are incomplete. Some of the months were totally missing or had values which were very low compared to previous months. Thus I dropped these 2 years.
+
+The Start_Time column contains the timestamp of accident occurrence. From this I extracted useful temporal info like year, month, year-month, date, day, hour and weekday of occurrence into 7 different columns.
+
+The raw data set contains 47 columns. For the scope of this project many columns are irrelevant. These are dropped directly. 
+
+Weather related fields like temperature, humidity, precipitation, etc have missing values. I imputed the missing values in these columns using MICE package. This uses predictive mean mapping for the imputation. 
+
+
+Data aggregation: 
+
+#Subsetting accidents in Massachusetts
+```{r}
+accidentsne <- accidents %>% filter(State %in% c("MA","NH","ME","VT","CT","RI"))
+```
+
+#Creating new temporal variable columns from timestamp
+
+```{r}
+accidentsne$year <- format(as.POSIXct(accidentsne$Start_Time), format="%Y")
+accidentsne$month <- format(as.POSIXct(accidentsne$Start_Time), format="%m")
+accidentsne$wday <- weekdays(as.POSIXct(accidentsne$Start_Time))
+accidentsne$day <- format(as.POSIXct(accidentsne$Start_Time), format="%d")
+accidentsne$hour <- format(as.POSIXct(accidentsne$Start_Time), format="%H")
+
+accidentsne$date <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%m-%d')
+accidentsne$ym <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%m')
+
+accidentsne$yw <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%V')
+```
+
+
+```{r}
+
+
+accidentsne$amenity_b <- ifelse(accidentsne$Amenity == "True",1,0)
+accidentsne$bump_b <- ifelse(accidentsne$Bump == "True",1,0)
+accidentsne$crossing_b <- ifelse(accidentsne$Crossing == "True",1,0)
+accidentsne$give_way_b <- ifelse(accidentsne$Give_Way == "True",1,0)
+accidentsne$junction_b <- ifelse(accidentsne$Junction == "True",1,0)
+accidentsne$noexit_b <- ifelse(accidentsne$No_Exit == "True",1,0)
+accidentsne$railway_b <- ifelse(accidentsne$Railway == "True",1,0)
+accidentsne$roundabout_b <- ifelse(accidentsne$Roundabout == "True",1,0)
+accidentsne$station_b <- ifelse(accidentsne$Station == "True",1,0)
+accidentsne$stop_b <- ifelse(accidentsne$Stop == "True",1,0)
+accidentsne$traffic_calming_b <- ifelse(accidentsne$Traffic_Calming == "True",1,0)
+accidentsne$traffic_signal_b <- ifelse(accidentsne$Traffic_Signal == "True",1,0)
+accidentsne$turning_loop_b <- ifelse(accidentsne$Turning_Loop == "True",1,0)
+accidentsne$sunrise_sunset_b <- ifelse(accidentsne$Sunrise_Sunset == "Day",1,0)
+
+```
+
+#Dropping irrelevant columns and dropping 2016 data as it is incomplete
+
+```{r}
+drop <- c("Start_Time","End_Time","Description","Number","Street","Zipcode","Timezone","Airport_Code","Weather_Timestamp","Distance.mi.","Start_Lat","Start_Lng","End_Lng","End_Lat","Country","City","Wind_Direction","Civil_Twilight","Nautical_Twilight","Astronomical_Twilight","Severity","Amenity","Bump","Crossing","Give_Way","Junction","No_Exit","Railway","Roundabout","Station","Stop","Traffic_Calming","Traffic_Signal","Turning_Loop","Sunrise_Sunset")
+
+accidentsne <- accidentsne %>% filter(year %in% c(2017,2018,2019))
+accidentsne <- accidentsne[,!(names(accidentsne) %in% drop)]
+
+accidents_ne_pos_agg <- accidentsne %>% group_by(State, County) %>% summarise(n=n(), amenity = sum(amenity_b)/n(), crossing = sum(crossing_b)/n(), give_way = sum(give_way_b)/n(), junction = sum(junction_b)/n(), railway = sum(railway_b)/n(), station = sum(station_b)/n(), stop = sum(stop_b)/n(),traffic_signal = sum(traffic_signal_b)/n(),sunrise_sunset = sum(sunrise_sunset_b)/n())
+
+
+
+```
+
+```{r}
+
+data("brandsma", package = "mice")
+brandsma
+
+```
+
+
+
+#Missing Data Imputation
+
+```{r}
+
+accidentsne.mis <- subset(accidentsne, select = c(State, County, Temperature.F.,Wind_Chill.F.,Humidity...,Pressure.in.,Visibility.mi.,Wind_Speed.mph.,Precipitation.in.))
+
+imputed_Data <- mice(accidentsne.mis, m=1, maxit = 50, method = 'pmm', seed = 500, refresh = 0)
+completeData <- complete(imputed_Data,1)
+
+drop <- c("Temperature.F.","Wind_Chill.F.","Humidity...","Pressure.in.","Visibility.mi.","Wind_Speed.mph.","Precipitation.in.","State","County")
+accidentsne <- accidentsne[,!(names(accidentsne) %in% drop)]
+
+accidentsne <- cbind(accidentsne,completeData)
+
+```
+
+
+#Data aggregation 
+```{r}
+```
+
+```{r}
+length(unique(accidentsne$County))
+```
+
+```{r}
+accidents_ne_ms <- accidents_ne_met_agg[accidents_ne_met_agg$County == 'Suffolk',]
+
+ggplot(accidents_ne_ms, aes(x=n)) + 
+  geom_histogram(binwidth=1)
+```
+
+```{r}
+
+accidents_ne_met_agg <- accidentsne %>% group_by(State, County, ym, wday, date) %>% summarise(n=n(), temp = mean(Temperature.F.), windchill = mean(Wind_Chill.F.), humidity = mean(Humidity...), pressure = mean(Pressure.in.), visibility = mean(Visibility.mi.), windspeed = mean(Wind_Speed.mph.), precipitation = sum(Precipitation.in.),  )
+
+dates <- as.data.frame(seq(as.Date("2017-01-01"), as.Date("2019-12-31"), by="days"))
+dates <- rename(dates, date = "seq(as.Date(\"2017-01-01\"), as.Date(\"2019-12-31\"), by = \"days\")")
+dates$yw <- format(dates$date, format="%Y-%V")
+dates$ym <- format(dates$date, format="%Y-%m")
+dates$wday <- weekdays(dates$date)
+dates$year <- format(dates$date, format="%Y")
+dates$month <- format(dates$date, format="%m")
+
+dates_c <- unique(dates[c("ym","wday","date")])
+counties <- unique(accidentsne[c("State","County")])
+
+comb <- counties %>% full_join(dates_c,by=character())
+
+joined <- merge(x=comb,y=accidents_ne_met_agg,by=c("State","County","ym","wday","date"),all.x=TRUE)
+
+joined[is.na(joined$n),]$n <- 0
+
+
+
+```
+
+```{r}
+install.packages("miceadds")
+library(miceadds)
+
+methods <- c("sample", "pmm", "2l.pan", "2l.norm", "2l.pmm")
+result <- vector("list", length(methods))
+names(result) <- methods
+for (meth in methods) {
+  d <- joined[, c("County", "temp")]
+  pred <- make.predictorMatrix(d)
+  pred["temp", "County"] <- -2
+  result[[meth]] <- mice(d, pred = pred, meth = meth,
+                         m = 10, maxit = 1,
+                         print = FALSE, seed = 82828)
+}
+```
+
+
+
+```{r}
+
+joined.mis <- subset(joined, select = c(State, County, Temperature.F.,Wind_Chill.F.,Humidity...,Pressure.in.,Visibility.mi.,Wind_Speed.mph.,Precipitation.in.))
+
+
+
+imputed_Data <- mice(accidentsne.mis, m=1, maxit = 50, method = 'pmm', seed = 500)
+completeData <- complete(imputed_Data,1)
+
+drop <- c("Temperature.F.","Wind_Chill.F.","Humidity...","Pressure.in.","Visibility.mi.","Wind_Speed.mph.","Precipitation.in.","State","County")
+accidentsne <- accidentsne[,!(names(accidentsne) %in% drop)]
+
+accidentsne <- cbind(accidentsne,completeData)
+
+```
+
+Model building
+
+#Frequency of accidents ~ Temporal variables + meteorological variables
+
+```{r}
+
+ne_model_1 <- glmer( n ~ windchill+ humidity + temp + pressure + visibility + windspeed + precipitation + (1 + 1|wday) + (1+1|County) , data = accidents_ne_met_agg, family = poisson(link = "log"))
+
+summary(ne_model_1)
+ranef(ne_model_1)
+coef(ne_model_1)
+
+ne_model_2 <- glmer( n ~ windchill+ humidity + temp + pressure + visibility + windspeed + precipitation + (1 + 1|wday)  , data = accidents_ne_met_agg, family = poisson(link = "log"))
+
+```
+
+
+
+Policy question - Tie it to Infrastructure bill 
+
+#
+
+
+```{r}
+
+#Correlation between Temperature and Wind Chill
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+#Correlation between Visibility and Precipitation
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+#Correlation between Humidity and Precipitation
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+
+model <- Severity ~ County+State+Side+year+month+day+hour+wday+Severity
+accidentsreg <- polr(formula = model, data = accidents)
+
+```
+
+

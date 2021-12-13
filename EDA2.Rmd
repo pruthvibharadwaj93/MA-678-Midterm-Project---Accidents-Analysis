@@ -1,0 +1,466 @@
+---
+title: "Midterm Project"
+author: "Pruthvi Bharadwaj"
+date: "11/8/2021"
+output: pdf_document
+---
+Access the codes at : [github: https://github.com/]
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load(
+ggplot2,
+rjson,
+knitr,
+arm,
+data.table,
+tidyverse,
+rstan,
+rstanarm,
+DHARMa
+)
+```
+
+Abstract
+
+The global epidemic of road crash fatalities and disabilities is gradually being recognized as a major public health concern. Reducing traffic accidents is an important public safety challenge around the world.
+The first step to being informed about global road safety and to developing effective road safety interventions is to have access to facts. #Something about policy here#
+
+This project aims to understand the relationship of daily frequency of accidents with temporal and demographic variables at a county level in the 6 states of the New England region in the USA. A generalized multilevel mixed effects model is used to predict the frequency of accidents in the different counties of the region and their association with weather related variables are explored. The implications and limitations for choosing multilevel mixed effects model are also discussed later. This report offers only directional inferences to explain fluctuation in frequency of accidents. Next steps and additional layers of complexity that can be incorporated in accident frequency prediction are also suggested towards the end.
+
+Introduction
+
+Accident prediction is important for optimizing public transportation, enabling safer routes, and cost-effectively improving the transportation infrastructure, all in order to make the roads safer. Given its significance, accident analysis and prediction has been a topic of much research in the past few decades.
+Analyzing the impact of environmental stimuli (e.g., road-network properties, weather, and traffic) on traffic accident occurrence patterns, predicting frequency of accidents within a geographical region, and predicting risk of accidents are the major related research categories. 
+
+Background 
+
+
+
+Method
+
+Dataset
+
+US-Accidents is a dataset that is available on Kaggle.It is a countrywide car accident dataset, which covers 49 states of the USA. It contains car accidents records from February 2016 to December 2020. It was collected using multiple APIs that provide streaming traffic incident (or event) data. Currently, there are about 1.5 million accident records in this dataset.
+
+The dataset offers a wide range of data attributes to describe each accident record. It includes location data(coordinates, Geographical info like State, City, County), time data(timestamp of accident, day/night indicator), natural language description of event, weather data(Temperature, humidity, precipitation, etc),  and relevant points-of-interest data (traffic signal, stop sign, etc.).
+
+It can be used for numerous applications such as real-time car accident prediction, studying car accidents hotspot locations, casualty analysis and extracting cause and effect rules to predict car accidents, and studying the impact of precipitation or other environmental stimuli on accident occurrence. The most recent release of the dataset can also be useful to study the impact of COVID-19 on traffic behavior and accidents.
+
+The other data sets were obtained from the following sources
+  1.County-level population related numbers were obtained from Census.gov and Economic research service websites
+  2.County-wise commuter related numbers numbers were obtained from Bureau of Transportation Statistics website
+
+https://www2.census.gov/programs-surveys/popest/datasets/2010-2020/counties/asrh/
+
+https://www.ers.usda.gov/data-products/county-level-data-sets/download-data/
+
+https://data.bts.gov/Research-and-Statistics/County-Transportation-Profiles/qdmf-cxm3/data
+
+Moosavi, Sobhan, Mohammad Hossein Samavatian, Srinivasan Parthasarathy, and Rajiv Ramnath. “A Countrywide Traffic Accident Dataset.”, arXiv preprint arXiv:1906.05409 (2019).
+
+Moosavi, Sobhan, Mohammad Hossein Samavatian, Srinivasan Parthasarathy, Radu Teodorescu, and Rajiv Ramnath. “Accident Risk Prediction based on Heterogeneous Sparse Data: New Dataset and Insights.” In proceedings of the 27th ACM SIGSPATIAL International Conference on Advances in Geographic Information Systems, ACM, 2019.
+
+
+#Importing the dataset
+
+#Accidents data
+
+```{r}
+
+path <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/US_Accidents_Dec20_updated.csv"
+accidents <- read.csv(path)
+
+```
+
+#Defining function to cut last n characters in a string
+
+```{r}
+substrRight <- function(x, n){
+  substr(x, 1, nchar(x)-n)
+}
+```
+
+
+#Citytransport dataset
+```{r}
+#Filepath of county transport files
+pathctytrnspt <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/County_Transportation_Profiles.csv"
+
+ctytrnspt <- read.csv(pathctytrnspt)
+
+#Defining new statename abbreviation column
+
+ctytrnspt$stname <- ifelse(ctytrnspt$State.Name == 'Connecticut', 'CT' , ifelse(ctytrnspt$State.Name == 'Maine','ME',ifelse(ctytrnspt$State.Name == 'Massachusetts', 'MA',ifelse(ctytrnspt$State.Name == 'New Hampshire', 'NH',ifelse(ctytrnspt$State.Name == 'Rhode Island', 'RI', 'VT')))))
+
+#Dropping unneeded columns
+
+drop <- c("County.FIPS","State.FIPS","Total.Docks","Total.Marinas","Rout.miles.of.freight.railroad","X..of.Medium.to.Fair.Condition.Bridges","Route.miles.ofpassenger.railroad.and.rail.transit","Route.miles.of.freight.railroad","Route.miles.of.passenger.railroad.and.rail.transit","Number.of.residents","State.Name")
+
+ctytrnspt <- ctytrnspt[,!(names(ctytrnspt) %in% drop)]
+
+#Trimming county names
+
+ctytrnspt$County.Name <- str_trim(ctytrnspt$County.Name)
+ctytrnspt$County.Name <- substrRight(ctytrnspt$County.Name,7)
+```
+
+
+#Unemployment dataset
+```{r}
+pathunemp <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/Unemployment.csv"
+unemployment <- read.csv(pathunemp)
+
+unemployment$Area_name <- substrRight(unemployment$Area_name,11)
+
+drop <- c("Med_HH_Income_Percent_of_State_Total_2019","Employed_2020","Unemployed_2020","Civilian_labor_force_2020")
+unemployment <- unemployment[,!(names(unemployment) %in% drop)]
+
+unemployment$Median_Household_Income_2019 <- as.numeric(unemployment$Median_Household_Income_2019)
+
+```
+
+
+#Education  dataset
+```{r}
+pathedu <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/Education.csv"
+education <- read.csv(pathedu)
+education$Area.name <- str_trim(education$Area.name)
+
+education$Area.name <- substrRight(education$Area.name,7)
+
+drop <- c("FIPS.Code")
+education <- education[,!(names(education) %in% drop)]
+
+```
+
+#Poverty dataset
+```{r}
+pathpov <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/Poverty.csv"
+poverty <- read.csv(pathpov)
+poverty$County <- str_trim(poverty$County)
+poverty$County <- substrRight(poverty$County,7)
+```
+
+
+#Population Dataset
+```{r}
+
+#Defining paths for statewise population files
+
+pathcon <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-09.csv"
+pathmaine <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-23.csv"
+pathmas <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-25.csv"
+pathnh <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-33.csv"
+pathri <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-44.csv"
+pathve <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents/CC-EST2020-AGESEX-50.csv"
+
+#Importing statewise population files
+
+popcon <- read.csv(pathcon)
+popmaine <- read.csv(pathmaine)
+popmas <- read.csv(pathmas)
+popnh <- read.csv(pathnh)
+popri <- read.csv(pathri)
+popve <- read.csv(pathve)
+
+#Filtering only necessary columns 
+
+keep <- c("POPESTIMATE","POPEST_MALE","POPEST_FEM","MEDIAN_AGE_TOT","STNAME","CTYNAME")
+
+popcon <- popcon %>% filter(YEAR %in% c(13))
+popcon <- popcon[,(names(popcon) %in% keep)]
+
+popmaine <- popmaine %>% filter(YEAR %in% c(13))
+popmaine <- popmaine[,(names(popmaine) %in% keep)]
+
+popmas <- popmas %>% filter(YEAR %in% c(13))
+popmas <- popmas[,(names(popmas) %in% keep)]
+
+popnh <- popnh %>% filter(YEAR %in% c(13))
+popnh <- popnh[,(names(popnh) %in% keep)]
+
+popri <- popri %>% filter(YEAR %in% c(13))
+popri <- popri[,(names(popri) %in% keep)]
+
+popve <- popve %>% filter(YEAR %in% c(13))
+popve <- popve[,(names(popve) %in% keep)]
+
+#Combining statewise dataframes
+
+pop <- rbind(popve,popri,popnh,popmas,popmaine,popcon)
+
+#Creating new columns
+pop$m_f_ratio <- pop$POPEST_MALE / pop$POPEST_FEM
+
+pop$stname <- ifelse(pop$STNAME == 'Connecticut', 'CT' , ifelse(pop$STNAME == 'Maine','ME',ifelse(pop$STNAME == 'Massachusetts', 'MA',ifelse(pop$STNAME == 'New Hampshire', 'NH',ifelse(pop$STNAME == 'Rhode Island', 'RI', 'VT')))))
+
+#Dropping unneeded columns
+drop <- c("STNAME","POPEST_MALE","POPEST_FEM")
+pop <- pop[,!(names(pop) %in% drop)]
+
+#Getting right county name string
+pop$CTYNAME <- str_trim(pop$CTYNAME)
+pop$CTYNAME <- substrRight(pop$CTYNAME,7)
+
+```
+
+#Combining datasets
+```{r}
+
+join1 <- inner_join(x=pop,y=poverty,by=c("stname" = "State","CTYNAME" = "County"))
+
+join2 <- inner_join(x=ctytrnspt,y=unemployment,by=c("stname" = "State","County.Name" = "Area_name"))
+
+group_level_var <- left_join(x=join1, y=join2, by=c("CTYNAME"="County.Name","stname"="stname"))
+
+```
+
+Data Cleaning and Preparation
+
+The entire dataset contains accident occurrences across 49 states in the US. For my project I was only focusing on 6 states(Connecticut, Maine, Massachusetts, New Hampshire, Vermont, Rhode Island) in New England and hence I filtered out only the relevant records. 
+
+Also, during data exploration I found that data from 2016 and 2020 are incomplete. Some of the months were totally missing or had values which were very low compared to previous months. Thus I dropped these 2 years.
+
+The Start_Time column contains the timestamp of accident occurrence. From this I extracted useful temporal info like year, month, year-month, date, day, hour and weekday of occurrence into 7 different columns.
+
+The raw data set contains 47 columns. For the scope of this project many columns are irrelevant. These are dropped directly. 
+
+The population, economy and transportation numbers at a county level were all available in different csvs. All these were imported and stitched together to form one comprehensive dataframe with all the required variables.
+
+
+
+
+Data aggregation: 
+
+#Subsetting accidents in New England
+```{r}
+accidentsne <- accidents %>% filter(State %in% c("MA","NH","ME","VT","CT","RI"))
+```
+
+#Creating new temporal variable columns from timestamp
+```{r}
+accidentsne$year <- format(as.POSIXct(accidentsne$Start_Time), format="%Y")
+accidentsne$month <- format(as.POSIXct(accidentsne$Start_Time), format="%m")
+accidentsne$wday <- weekdays(as.POSIXct(accidentsne$Start_Time))
+accidentsne$day <- format(as.POSIXct(accidentsne$Start_Time), format="%d")
+accidentsne$hour <- format(as.POSIXct(accidentsne$Start_Time), format="%H")
+accidentsne$date <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%m-%d')
+accidentsne$ym <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%m')
+accidentsne$yw <- format(as.POSIXct(accidentsne$Start_Time), format='%Y-%V')
+```
+
+#Creating new binary variable for POI variables
+```{r}
+accidentsne$amenity_b <- ifelse(accidentsne$Amenity == "True",1,0)
+accidentsne$bump_b <- ifelse(accidentsne$Bump == "True",1,0)
+accidentsne$crossing_b <- ifelse(accidentsne$Crossing == "True",1,0)
+accidentsne$give_way_b <- ifelse(accidentsne$Give_Way == "True",1,0)
+accidentsne$junction_b <- ifelse(accidentsne$Junction == "True",1,0)
+accidentsne$noexit_b <- ifelse(accidentsne$No_Exit == "True",1,0)
+accidentsne$railway_b <- ifelse(accidentsne$Railway == "True",1,0)
+accidentsne$roundabout_b <- ifelse(accidentsne$Roundabout == "True",1,0)
+accidentsne$station_b <- ifelse(accidentsne$Station == "True",1,0)
+accidentsne$stop_b <- ifelse(accidentsne$Stop == "True",1,0)
+accidentsne$traffic_calming_b <- ifelse(accidentsne$Traffic_Calming == "True",1,0)
+accidentsne$traffic_signal_b <- ifelse(accidentsne$Traffic_Signal == "True",1,0)
+accidentsne$turning_loop_b <- ifelse(accidentsne$Turning_Loop == "True",1,0)
+accidentsne$sunrise_sunset_b <- ifelse(accidentsne$Sunrise_Sunset == "Day",1,0)
+```
+
+#Dropping irrelevant columns and dropping 2016 and 2020 data as it is incomplete
+
+```{r}
+drop <- c("Start_Time","End_Time","Description","Number","Street","Zipcode","Timezone","Airport_Code","Weather_Timestamp","Distance.mi.","Start_Lat","Start_Lng","End_Lng","End_Lat","Country","City","Wind_Direction","Civil_Twilight","Nautical_Twilight","Astronomical_Twilight","Severity","Amenity","Bump","Crossing","Give_Way","Junction","No_Exit","Railway","Roundabout","Station","Stop","Traffic_Calming","Traffic_Signal","Turning_Loop","Sunrise_Sunset","Temperature.F.","Wind_Chill.F.","Humidity...","Pressure.in.","Visibility.mi.","Wind_Speed.mph.","Precipitation.in.")
+
+accidentsne <- accidentsne %>% filter(year %in% c(2017,2018,2019))
+accidentsne <- accidentsne[,!(names(accidentsne) %in% drop)]
+
+```
+
+#Data aggregation 
+```{r}
+accidents_ne_pos_agg <- accidentsne %>% group_by(State, County) %>% summarise(n=n(), amenity = sum(amenity_b)/n(), crossing = sum(crossing_b)/n(), give_way = sum(give_way_b)/n(), junction = sum(junction_b)/n(), railway = sum(railway_b)/n(), station = sum(station_b)/n(), stop = sum(stop_b)/n(),traffic_signal = sum(traffic_signal_b)/n(),sunrise_sunset = sum(sunrise_sunset_b)/n())
+```
+
+
+```{r}
+
+#Accidents data aggregation
+accidents_ne_agg <- accidentsne %>% group_by(State, County, month, wday, date, day) %>% summarise(n=n())
+
+#Creating a data frame of all dates from Jan-2017 to Dec-2019
+dates <- as.data.frame(seq(as.Date("2017-01-01"), as.Date("2019-12-31"), by="days"))
+dates <- rename(dates, date = "seq(as.Date(\"2017-01-01\"), as.Date(\"2019-12-31\"), by = \"days\")")
+dates$yw <- format(dates$date, format="%Y-%V")
+dates$ym <- format(dates$date, format="%Y-%m")
+dates$wday <- weekdays(dates$date)
+dates$year <- format(dates$date, format="%Y")
+dates$month <- format(dates$date, format="%m")
+dates$day <- format(dates$date, format="%d")
+
+dates_c <- unique(dates[c("month","wday","date","day")])
+
+#Creating a dataframe of unique counties
+counties <- unique(accidentsne[c("State","County")])
+
+#Combining counties and dates
+comb <- counties %>% full_join(dates_c,by=character())
+
+#Combining exhaustive combination with 
+joined <- merge(x=comb,y=accidents_ne_agg,by=c("State","County","month","wday","date","day"),all.x=TRUE)
+
+joined[is.na(joined$n),]$n <- 0
+
+accidents_ne_agg_g <- left_join(x = joined, y = group_level_var, by=c("County"="CTYNAME","State"="stname"))
+
+```
+
+Model building
+
+#Frequency of accidents ~ Temporal variables + meteorological variables
+
+```{r}
+
+
+accidents_ne_agg_g$Percent.of.resident.workers <- accidents_ne_agg_g$Number.of.resident.workers/accidents_ne_agg_g$POPESTIMATE
+
+accidents_ne_agg_g$Percent.of.resident.workers.who.work.at.home <- accidents_ne_agg_g$Number.of.resident.workers.who.work.at.home/accidents_ne_agg_g$POPESTIMATE
+
+accidents_ne_agg_g$Percent.of.resident.workers.who.commute.within.county <- accidents_ne_agg_g$Number.of.resident.workers.who.commute.within.county/accidents_ne_agg_g$POPESTIMATE
+
+accidents_ne_agg_g$Percent.of.resident.workers.who.commute.to.work.in.other.counties <- accidents_ne_agg_g$Number.of.resident.workers.who.commute.to.work.in.other.counties/accidents_ne_agg_g$POPESTIMATE
+
+accidents_ne_agg_g$Percent.of.workers.from.other.counties.who.commute.to.work.in.the.county <- accidents_ne_agg_g$Number.of.workers.from.other.counties.who.commute.to.work.in.the.county/accidents_ne_agg_g$POPESTIMATE
+
+"MEDIAN_AGE_TOT"                                                         
+"m_f_ratio" 
+"PopBelowPoverty"
+"Number.of.Bridges"                                                      
+
+"Percent.of.resident.workers.who.commute.by.transit"                     
+"Number.of.resident.workers.who.work.at.home"                            
+"Number.of.workers.from.other.counties.who.commute.to.work.in.the.county"
+"Number.of.resident.workers.who.commute.to.work.in.other.counties"       
+"Number.of.resident.workers.who.commute.within.county"                   
+"Number.of.resident.workers"
+"Median_Household_Income_2019"
+
+
+
+ne_model_1 <- glmer(n ~ log(POPESTIMATE)  + log(Number.of.business.establishments) + log(Median_Household_Income_2019) + wday+ Percent.of.resident.workers + Percent.of.resident.workers.who.work.at.home + Percent.of.resident.workers.who.commute.within.county + Percent.of.resident.workers.who.commute.to.work.in.other.counties + Percent.of.workers.from.other.counties.who.commute.to.work.in.the.county + Percent.of.resident.workers.who.commute.by.transit + (1+1|County) , data = accidents_ne_agg_g, family = poisson(link = "log"))
+
+summary(ne_model_1)
+ranef(ne_model_1)
+coef(ne_model_1)
+
+```
+
+
+```{r}
+
+testDispersion(ne_model_1)
+
+res <- simulateResiduals(ne_model_1)
+
+plot(res)
+
+plot(predict(ne_model_1),resid(ne_model_1))
+
+```
+
+```{r}
+
+
+simulationOutput1 <- simulateResiduals(fittedModel = ne_model_1)
+plot(simulationOutput1)
+testZeroInflation(simulationOutput1)
+testDispersion(simulationOutput1)
+
+```
+```{r}
+
+```
+
+
+#Model 2
+```{r}
+
+
+
+ne_model_2 <- glmmTMB(n ~ log(POPESTIMATE)  + log(Number.of.business.establishments) + log(Median_Household_Income_2019) + wday+ Percent.of.resident.workers + Percent.of.resident.workers.who.work.at.home + Percent.of.resident.workers.who.commute.within.county + Percent.of.resident.workers.who.commute.to.work.in.other.counties + Percent.of.workers.from.other.counties.who.commute.to.work.in.the.county + Percent.of.resident.workers.who.commute.by.transit + (1+1|County) , data = accidents_ne_agg_g, family = poisson(link = "log"), ziformula = ~1)
+
+summary()
+
+
+```
+
+```{r}
+library(lattice)
+
+histogram(~accidents_ne_agg_g$n|accidents_ne_agg_g$County,
+   main="Histogram",
+   xlab="Number of accidents")
+
+
+hist(accidents_ne_agg_g$n,main="Histogram",
+   xlab="Number of accidents")
+```
+
+
+```{r}
+simulationOutput2 <- simulateResiduals(fittedModel = ne_model_2)
+plot(simulationOutput2)
+testZeroInflation(simulationOutput2)
+testDispersion(simulationOutput2)
+
+```
+
+#Model 3
+```{r}
+ne_model_3 <- glm(n ~ log(POPESTIMATE)  + log(Number.of.business.establishments) + log(Median_Household_Income_2019) + wday+ Percent.of.resident.workers + Percent.of.resident.workers.who.work.at.home + Percent.of.resident.workers.who.commute.within.county + Percent.of.resident.workers.who.commute.to.work.in.other.counties + Percent.of.workers.from.other.counties.who.commute.to.work.in.the.county + Percent.of.resident.workers.who.commute.by.transit  , data = accidents_ne_agg_g, family = poisson(link = "log"))
+
+simulationOutput3 <- simulateResiduals(fittedModel = ne_model_3)
+plot(simulationOutput3)
+testZeroInflation(simulationOutput3)
+testDispersion(simulationOutput3)
+
+```
+
+```{r}
+ne_model_4 <- glmmTMB(n ~ (1+1|County) , data = accidents_ne_agg_g, family = poisson(link = "log"))
+
+```
+
+```{r}
+
+simulationOutput4 <- simulateResiduals(fittedModel = ne_model_4)
+plot(simulationOutput4)
+testZeroInflation(simulationOutput4)
+testDispersion(simulationOutput4)
+
+```
+
+#Policy question - Tie it to Infrastructure bill 
+
+```{r}
+
+#Correlation between Temperature and Wind Chill
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+#Correlation between Visibility and Precipitation
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+#Correlation between Humidity and Precipitation
+cor(accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Temperature.F.,
+accidents[!is.na(accidents$Temperature.F.) & !is.na(accidents$Wind_Chill.F.),]$Wind_Chill.F.)
+
+
+model <- Severity ~ County+State+Side+year+month+day+hour+wday+Severity
+accidentsreg <- polr(formula = model, data = accidents)
+
+```
+
+

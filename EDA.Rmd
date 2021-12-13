@@ -1,0 +1,215 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+EDA
+
+```{r}
+
+accidents_ne_agg_eda <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),
+pop = mean(POPESTIMATE),
+age = mean(MEDIAN_AGE_TOT),
+pov = mean(PopBelowPoverty),
+inc = mean(Median_Household_Income_2019),
+bus = mean(Number.of.business.establishments),
+bridge = mean(Number.of.Bridges),
+reswork = mean(Number.of.resident.workers/POPESTIMATE),
+comtrans = mean(Percent.of.resident.workers.who.commute.by.transit),
+wfoc = mean(Number.of.workers.from.other.counties.who.commute.to.work.in.the.county/POPESTIMATE),
+reswh = mean(Number.of.resident.workers.who.work.at.home/POPESTIMATE),
+reswcwc = mean(Number.of.resident.workers.who.commute.within.county/POPESTIMATE),
+)
+
+```
+```{r}
+accidents_ne_agg_pop <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),pop = mean(POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_pop) +
+  aes(log(pop),log(n_acc)) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County level population vs accidents",x="County Population",y="No.of accidents in 3 years") +
+  geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+
+```{r}
+accidents_ne_agg_age <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),age = mean(MEDIAN_AGE_TOT))
+
+ggplot(data = accidents_ne_agg_age) +
+  aes(age,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County level median age vs accidents",x="County Median age",y="No.of accidents in 3 years")   #geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+```{r}
+
+accidents_ne_agg_bus <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),bus = mean(Number.of.business.establishments))
+
+ggplot(data = accidents_ne_agg_bus) +
+  aes(log(bus),log(n_acc)) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County level business establishments vs accidents",x="Number of business establishments",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+
+```{r}
+
+accidents_ne_agg_bridge <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),bridge = mean(Number.of.Bridges))
+
+ggplot(data = accidents_ne_agg_bridge) +
+  aes(bridge,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Bridges vs accidents",x="Number of bridges",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+```{r}
+accidents_ne_agg_p_air <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),p_air = mean(Primary.and.Commercial.Airports))
+
+ggplot(data = accidents_ne_agg_p_air) +
+  aes(p_air,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Primary airports vs accidents",x="Number of bridges",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+
+
+
+```{r}
+
+accidents_ne_agg_mf <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),mf = mean(m_f_ratio))
+
+ggplot(data = accidents_ne_agg_mf) +
+  aes(mf,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County Level Sex ratio vs accidents",x="Sex Ratio",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+
+#Average Daily frequency  by year and state
+
+```{r}
+
+accidents_ne_agg_pov <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),pov = mean(PopBelowPoverty))
+
+ggplot(data = accidents_ne_agg_pov) +
+  aes(pov,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County Level Population below Poverty vs accidents",x="Population below poverty",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+#Year- month wise accident frequency
+
+```{r}
+
+accidents_ne_agg_inc <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),inc = mean(Median_Household_Income_2019))
+
+ggplot(data = accidents_ne_agg_inc) +
+  aes(inc,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County Level Median household income vs accidents",x="Median household income",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+#Average daily 
+
+```{r}
+
+accidents_ne_agg_inc <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),inc = mean(Median_Household_Income_2019))
+
+ggplot(data = accidents_ne_agg_inc) +
+  aes(inc,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County Level Median household income vs accidents",x="Median household income",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+#Statewise Average daily variation in accident frequency over a month
+
+```{r}
+
+accidents_ne_agg_resw <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),reswork = mean(Number.of.resident.workers/POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_resw) +
+  aes(reswork,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "County Level Resident workers vs accidents",x="Resident workers",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+#2 Average daily accidents by day of the week
+
+```{r}
+
+accidents_ne_agg_reswcwc <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),reswcwc = mean(Number.of.resident.workers.who.commute.within.county/POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_reswcwc) +
+  aes(reswcwc,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Resident workers who commute within county vs accidents",x="Resident workers who commute within county",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
+#1 Number of accidents by hour of day (split by severity maybe?)
+
+```{r}
+accidents_ne_agg_reswh <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),reswh = mean(Number.of.resident.workers.who.work.at.home/POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_reswh) +
+  aes(reswh,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Resident workers who work at home vs accidents",x="Resident workers who work at home",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+
+
+
+#2 Number of accidents by Weather Condition (split by severity maybe?)
+```{r}
+accidents_ne_agg_reswoc <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),reswoc = mean(Number.of.resident.workers.who.commute.to.work.in.other.counties/POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_reswoc) +
+  aes(reswoc,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Resident workers who commute to work in other counties vs no.of accidents",x="Resident workers who work at home",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+
+#Distribution of accidents by temperature
+
+
+```{r}
+accidents_ne_agg_wfoc <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),wfoc = mean(Number.of.workers.from.other.counties.who.commute.to.work.in.the.county/POPESTIMATE))
+
+ggplot(data = accidents_ne_agg_wfoc) +
+  aes(wfoc,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Workers from other counties who commute to work in the county vs accidents",x="Workers from other counties communting in the county",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+```
+
+```{r}
+
+accidents_ne_agg_comtrans <- accidents_ne_agg_g %>% group_by(State,County) %>% summarise(n_acc=sum(n),comtrans = mean(Percent.of.resident.workers.who.commute.by.transit))
+
+ggplot(data = accidents_ne_agg_comtrans) +
+  aes(comtrans,n_acc) +
+  geom_point(alpha = 0.3,aes(color = State)) +
+  scale_fill_brewer(direction = -1) +
+  labs(title = "Percent of resident workers who commute by transit vs accidents",x="Percent of resident workers who commute by transit",y="No.of accidents in 3 years") + geom_smooth(aes(color = State),se=F,method = "lm") 
+
+```
+
