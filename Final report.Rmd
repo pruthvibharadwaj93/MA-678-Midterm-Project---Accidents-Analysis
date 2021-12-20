@@ -4,7 +4,7 @@ author: "Pruthvi Bharadwaj"
 date: "12/10/2021"
 output: pdf_document
 ---
-Access the codes at : [github: https://github.com/]
+Access the codes at : [github: https://github.com/pruthvibharadwaj93/MA-678-Midterm-Project---Accidents-Analysis]
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
@@ -105,7 +105,7 @@ area <- read.csv(patharea)
 
 ```
 
-```{r}
+```{r include=FALSE}
 
 path <- "/Users/pruthvibharadwaj/Desktop/MA678 - ASM/Midterm Project/Accidents new/Book6.csv"
 miles <- read.csv(path)
@@ -198,7 +198,7 @@ final_ne <- final %>% filter(State.x %in% c("MA","NH","ME","VT","CT","RI"))
 ```
 
 
-```{r echo=FALSE, fig.height=4, fig.width=6, fig.cap="Scatterplot of Resident Commuters vs accidents in Counties in New England"}
+```{r echo=FALSE, fig.height=4, fig.width=6, fig.cap="Scatterplot of Resident Commuters vs accidents in Counties of New England"}
 ggplot(data = final_ne) +
   aes(log(res_commuters),log(n)) +
   geom_point(alpha = 0.3,aes(color = State.x)) +
@@ -209,7 +209,7 @@ ggplot(data = final_ne) +
 
 Fig 1 shows a plot of log of accidents against log of resident commuters. Data for 6 states in New England are plotted and points are colored differently for the chosen states. It is observed that there is an approximate linear relationship at State level between logged values of accidents vs resident commuters. The number of accidents go up as the number of commuters goes up. This indicates that a State level model with varying intercept and varying slope model with resident commuter as a predictor would be suitable. 
 
-```{r}
+```{r echo=FALSE, fig.height=4, fig.width=6, fig.cap="Scatterplot of Business Establishments vs accidents in Counties of New England"}
 ggplot(data = final_ne) +
   aes(log(Number.of.business.establishments),log(n)) +
   geom_point(alpha = 0.3,aes(color = State.x)) +
@@ -236,8 +236,14 @@ model <- lmer(data = final, log(n) ~ log(Number.of.Bridges) + log(poor.bridges+1
 
 ```{r eval=FALSE}
 
-model <- lmer(data = final, log(n) ~ log(Number.of.Bridges) + log(poor.bridges+1)  + log(res_commuters) +
-             trans_comm + log(Number.of.business.establishments) + log(non_res_commuters) + (1+log(res_commuters)|State.x) + (1+log(Number.of.business.establishments)|State.x)  + (1+log(Number.of.Bridges)|State.x) + (1+log(non_res_commuters)|State.x))
+model <- lmer(data = final, log(n) ~ log(Number.of.Bridges) 
+              + log(poor.bridges+1)  + log(res_commuters) + trans_comm 
+              + log(Number.of.business.establishments) 
+             + log(non_res_commuters)
+             +(1+log(res_commuters)|State.x)
+             +(1+log(Number.of.business.establishments)|State.x)  
+             + (1+log(Number.of.Bridges)|State.x) 
+             + (1+log(non_res_commuters)|State.x))
 
 ```
 
@@ -261,15 +267,24 @@ Fixed effects from the above model are shown below, all variables are significan
 
 Let us take the coefficients for Massachusetts and try to interpret each of the coefficients and its relationship with number of accidents.
 
-$$log(n)= -7.48 + 0.29\cdot log(Number.of.Bridges) - 0.05\cdot log(poor.bridges + 1) \\ + 0.34\cdot log(rescommuters)  + 2.07\cdot transcomm  + 0.16\cdot log(Number.of.business.establishments) \\  + 0.38\cdot log(nonrescommuters)$$
-The formula can be used for calculating the number of accidents in a county in Massachusetts given the variables listed in the formula. 
-1.Log(n) increases by 0.29 units if log(Number.of.Bridges) increases by one unit, keeping everything else constant. This also means that for a 1% increase in the Number.of.Bridges in a county, the number of accidents can be expected to increase by 0.29%.
-2.The coefficient for poor.bridges is small and is slightly negative. It is also not significant at alpha = 0.05. However, the negative effect comes as a bit of a surprise as one would expect higher number of poor bridges to have a positive effect on accidents. But it could be that bad bridges are not used or are used very little and hence do not contribute to accidents.
-3.Coefficient for log(res_commuters), log(Number.of.business.establishments) and log(non_res_commuters) all have a positive coeeficient and can be interpreted similar to the first coefficient.
-4.The intercept is negative, meaning a county which has no bridges or business establishments or commuters is likely to have 0 accidents. This is totally not surprising. But this will not be the case as any county would have high non-zero values for the predictors and since they all have a positive coefficient, this would make up for the negative intercept and the prediction for accidents would be above 0 for most of the counties.
+$$ log(n)= -7.48 + 0.29\cdot log(Number.of.Bridges) - 0.05\cdot log(poor.bridges + 1) $$ 
+$$+ 0.34\cdot log(rescommuters)  + 2.07\cdot transcomm  $$
+$$+ 0.16\cdot log(Number.of.business.establishments) + 0.38\cdot log(nonrescommuters)$$
+
+The formula can be used for calculating the number of accidents in a county in Massachusetts given the variables listed in the formula. \newline
+1.Log(n) increases by 0.29 units if log(Number.of.Bridges) increases by one unit, keeping everything else constant. This also means that for a 1% increase in the Number.of.Bridges in a county, the number of accidents can be expected to increase by 0.29%.\newline
+2.The coefficient for poor.bridges is small and is slightly negative. It is also not significant at alpha = 0.05. However, the negative effect comes as a bit of a surprise as one would expect higher number of poor bridges to have a positive effect on accidents. But it could be that bad bridges are not used or are used very little and hence do not contribute to accidents. \newline
+3.Coefficient for log(res_commuters), log(Number.of.business.establishments) and log(non_res_commuters) all have a positive coeeficient and can be interpreted similar to the first coefficient. \newline
+4.The intercept is negative, meaning a county which has no bridges or business establishments or commuters is likely to have 0 accidents. This is totally not surprising. But this will not be the case as any county would have high non-zero values for the predictors and since they all have a positive coefficient, this would make up for the negative intercept and the prediction for accidents would be above 0 for most of the counties. \newline
 5.The coefficient for trans_comm, that is ratio of people who use transit to total commuters in a county is 2.07. Since this ratio is always below 1 changes in trans_comm value would be small and the effect of this variable is always small. The positive effect of this variable also comes as a surprise as an increase in people who take transit is expected to reduce vehicles on road and hence the number of accidents. But this effect is small and hence it should be okay. 
 
 ### Model Validation
+
+From the Residual plots in Figure 3 we can see that the mean of residuals is almost 0. The residuals on the left side seem to have a pattern. This is because of the nature of the output where data is counts. 
+
+And for the Q-Q plot in Figure 3, all the dots in the middle are as expected on the normal line. But the dots tend to deviate from the normal line at the ends.
+
+Figure 4 shows that the output of pp_check which is obtained by fitting the same model using stan that the posterior predictive checks using simulation match closely with the posterior predictive distribution.
 
 ```{r echo=FALSE, fig.height=2.5, fig.width=6, fig.cap="Residual plot and Q-Q plot."}
 re <- plot(model)
@@ -282,16 +297,13 @@ grid.arrange(re,qq,nrow=1)
 fit2 <- stan_lmer(data = final, seed = 23, log(n) ~   log(Number.of.Bridges) + log(poor.bridges+1)  + log(res_commuters) +
              trans_comm + log(Number.of.business.establishments) + log(non_res_commuters) + (1+log(res_commuters)|State.x) + (-1+log(Number.of.business.establishments)|State.x)  + (-1+log(Number.of.Bridges)|State.x) + (-1+log(non_res_commuters)|State.x))
 
+
 ```
 
-```{r echo=FALSE, fig.height=2, fig.width=4, , eval = FALSE, fig.cap="Posterior Predictive check"}
+```{r echo=FALSE, fig.height=2, fig.width=4, fig.cap="Posterior Predictive check"}
 pp_check(fit2)
 ```
-From the Residual plots in Figure 4 we can see that the mean of residuals is almost 0. The residuals on the left side seem to have a pattern. This is because of the nature of the output where data is counts. 
 
-And for the Q-Q plot in Figure 4, all the dots in the middle are as expected on the normal line. But the dots tend to deviate from the normal line at the ends.
-
-Figure 5 shows that the output of pp_check which is obtained by fitting the same model using stan that the posterior predictive checks using simulation match closely with the posterior predictive distribution.
 
 ### Discussion
 
@@ -334,7 +346,7 @@ coef(model)
 ```
 ### More EDA
 
-```{r echo=FALSE, fig.cap="distribution plots for number of language, number of comments, number of views and duration"}
+```{r echo=FALSE, fig.cap="Other EDA plots"}
 
 final_agg <- final %>% group_by(STATEFP) %>% summarise(n=sum(n))
 final_agg <- rename(final_agg, fips = STATEFP)

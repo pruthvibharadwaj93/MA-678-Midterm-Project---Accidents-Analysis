@@ -4,7 +4,9 @@ output: html_notebook
 ---
 
 
-EDA
+EDA for midterm project
+
+#Data is loaded in Final report page
 
 ```{r}
 
